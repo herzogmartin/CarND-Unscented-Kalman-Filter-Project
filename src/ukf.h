@@ -108,6 +108,9 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateRadar(MeasurementPackage meas_package);
+
+private:
+  bool debug;
 };
 
 #endif /* UKF_H */
