@@ -19,16 +19,16 @@ Self-Driving Car Engineer Nanodegree Program
     - eg. `./UnscentedKF ../data/sample-laser-radar-measurement-data-1.txt output.txt`
 
 ## Results on sample data/
-sample-laser-radar-measurement-data-1.txt:
-RMSE:
-0.0725465
-0.0791208
-0.575515
-0.570454
-
-sample-laser-radar-measurement-data-2.txt
-RMSE:
-0.170291
-0.179895
-0.257296
-0.256373
+sample-laser-radar-measurement-data-1.txt: <br />
+RMSE: <br />
+0.0725465 <br />
+0.0791208 <br />
+0.575515 <br />
+0.570454 <br />
+ <br />
+sample-laser-radar-measurement-data-2.txt <br />
+RMSE: <br />
+0.170291 <br />
+0.179895 <br />
+0.257296 <br />
+0.256373 <br />
