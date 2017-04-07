@@ -18,7 +18,7 @@ Self-Driving Car Engineer Nanodegree Program
    some sample inputs in 'data/'.
     - eg. `./UnscentedKF ../data/sample-laser-radar-measurement-data-1.txt output.txt`
 
-## Results on sample data/
+## Results in folder sample data/
 sample-laser-radar-measurement-data-1.txt: <br />
 RMSE: <br />
 0.0725465 <br />
