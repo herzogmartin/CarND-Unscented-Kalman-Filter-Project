@@ -12,9 +12,6 @@ using Eigen::VectorXd;
  * Initializes Unscented Kalman filter
  */
 UKF::UKF() {
-  // if debug is true intermediate result are in ouput
-  debug = 0;
-
   // if this is false, laser measurements will be ignored (except during init)
   use_laser_ = true;
 
@@ -58,19 +55,21 @@ UKF::UKF() {
   weights_(0) = lambda_ / (lambda_ + n_aug_);
   weights_.tail(2*n_aug_).fill( 0.5 / (lambda_ + n_aug_) );
 
-	// create a 4D state vector, we don't know yet the values of the x state
+  // create a 5D state vector, we don't know yet the values of the x state
   // [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
-	x_ = VectorXd(n_x_);
+  x_ = VectorXd(n_x_);
 
-	// state covariance matrix P
+  // state covariance matrix P
   // only position can be initialized with first measurement
-	P_ = MatrixXd(n_x_, n_x_);
-	P_ <<   1, 0, 0,    0,    0,
-	        0, 1, 0,    0,    0,
-	        0, 0, 1, 0,    0,
-	        0, 0, 0,    1, 0,
-          0, 0, 0,    0,    1;
-
+  P_ = MatrixXd::Identity(n_x_, n_x_);
+/*
+  P_ = MatrixXd(n_x_, n_x_);
+  P_ <<   1, 0, 0, 0, 0,
+          0, 1, 0, 0, 0,
+          0, 0, 1, 0, 0,
+          0, 0, 0, 1, 0,
+          0, 0, 0, 0, 1;
+*/
   // predicted sigma points matrix; we don't know yet the values
   Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
 
@@ -94,13 +93,6 @@ UKF::~UKF() {}
  * either radar or laser.
  */
 void UKF::ProcessMeasurement(MeasurementPackage measurement_pack) {
-  /**
-  TODO:
-
-  Complete this function! Make sure you switch between lidar and radar
-  measurements.
-  */
-
   /*****************************************************************************
    *  Initialization
    ****************************************************************************/
@@ -112,30 +104,43 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_pack) {
       /**
       Convert radar from polar to cartesian coordinates and initialize state.
       */
-		  if (debug) std::cout << "Kalman Filter Initialization with Radar Measurement" << std::endl;
+#if UKF_DEBUG
+     std::cout << "Kalman Filter Initialization with Radar Measurement" << std::endl;
+#endif
 
-		  x_ << cos(measurement_pack.raw_measurements_[1]) * measurement_pack.raw_measurements_[0],
-            sin(measurement_pack.raw_measurements_[1]) * measurement_pack.raw_measurements_[0],
-            cos(measurement_pack.raw_measurements_[1]) * measurement_pack.raw_measurements_[2],
-            sin(measurement_pack.raw_measurements_[1]) * measurement_pack.raw_measurements_[2];
-		  time_us_ = measurement_pack.timestamp_;
+      x_ << cos(measurement_pack.raw_measurements_[1]) * measurement_pack.raw_measurements_[0], //px
+            sin(measurement_pack.raw_measurements_[1]) * measurement_pack.raw_measurements_[0], //py
+            abs(measurement_pack.raw_measurements_[2]), //v_abs
+            0., 0.; //psi and psiDot unkonwn, therefore set to zero
+//      P_(3,3) = 10.;
+//      P_(4,4) = 10.;
+      time_us_ = measurement_pack.timestamp_;
       is_initialized_ = true;
-	  }
+    }
     else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) 
     {
       /**
       Initialize state.
       */
-		  if (debug) std::cout << "Kalman Filter Initialization with Laser Measurement" << std::endl;
+#if UKF_DEBUG
+      std::cout << "Kalman Filter Initialization with Laser Measurement" << std::endl;
+#endif
 
-		  //set the state with the initial location and zero velocity
-		  x_ << measurement_pack.raw_measurements_[0], measurement_pack.raw_measurements_[1], 0, 0;
-		  time_us_ = measurement_pack.timestamp_;
+      //set the state with the initial location and zero velocity
+      x_ << measurement_pack.raw_measurements_[0], //px
+            measurement_pack.raw_measurements_[1], //py
+            0., 0., 0.; //v_abs, psi and psiDot unkonwn, therefore set to zero
+//      P_(2,2) = 10.;
+//      P_(3,3) = 10.;
+//      P_(4,4) = 10.;
+      time_us_ = measurement_pack.timestamp_;
       is_initialized_ = true;
     }
     else
     {
-		  if (debug) std::cout << "Kalman Filter Initialization failed; sensor unkown" << std::endl;
+#if UKF_DEBUG
+      std::cout << "Kalman Filter Initialization failed; sensor unkown" << std::endl;
+#endif
     }
     // done initializing, no need to predict or update
     return;
@@ -146,10 +151,12 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_pack) {
   ****************************************************************************/
 
   //compute the time elapsed between the current and previous measurements
-	double delta_t = (measurement_pack.timestamp_ - time_us_) / 1000000.0;	//dt - expressed in seconds
-	time_us_ = measurement_pack.timestamp_;
+  double delta_t = (measurement_pack.timestamp_ - time_us_) / 1000000.0;  //dt - expressed in seconds
+  time_us_ = measurement_pack.timestamp_;
 
-  if (debug) std::cout << "delta_t = " << delta_t << std::endl;
+#if UKF_DEBUG
+  std::cout << "delta_t = " << delta_t << std::endl;
+#endif
 
   //Prediction(delta_t);
   while (delta_t > 0.1)
@@ -160,18 +167,23 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_pack) {
   }
   Prediction(delta_t);
 
+  /*****************************************************************************
+  *  Update
+  ****************************************************************************/
 
   if (use_radar_ && measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
-	  // Radar updates
-		UpdateRadar(measurement_pack);
-	} 
+    // Radar updates
+    UpdateRadar(measurement_pack);
+  } 
   else if (use_laser_ && measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
-	  // Laser updates
-		UpdateLidar(measurement_pack);
-	}
+    // Laser updates
+    UpdateLidar(measurement_pack);
+  }
   else
   {
-		if (debug) std::cout << "Kalman Filter Update: sensor unkown or not used" << std::endl;
+#if UKF_DEBUG
+    std::cout << "Kalman Filter Update: sensor unkown or not used" << std::endl;
+#endif
   }
 
 }
@@ -182,13 +194,6 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_pack) {
  * measurement and this one.
  */
 void UKF::Prediction(double delta_t) {
-  /**
-  TODO:
-
-  Complete this function! Estimate the object's location. Modify the state
-  vector, x_. Predict sigma points, the state, and the state covariance matrix.
-  */
-
   /*****************************************************************************
   *  Create augmented sigma points
   ****************************************************************************/
@@ -209,11 +214,15 @@ void UKF::Prediction(double delta_t) {
   P_aug.topLeftCorner(n_x_,n_x_) = P_;
   P_aug(5,5) = std_a_*std_a_;
   P_aug(6,6) = std_yawdd_*std_yawdd_;
-  if (debug) std::cout << "P_aug = " << std::endl << P_aug << std::endl;
+#if UKF_DEBUG
+  std::cout << "P_aug = " << std::endl << P_aug << std::endl;
+#endif
   
   //calculate square root matrix
   MatrixXd A = P_aug.llt().matrixL();
-  if (debug) std::cout << "A = " << std::endl << A << std::endl;
+#if UKF_DEBUG
+  std::cout << "A = " << std::endl << A << std::endl;
+#endif
   
   //create augmented sigma points
   Xsig_aug.col(0) = x_aug;
@@ -225,7 +234,9 @@ void UKF::Prediction(double delta_t) {
   }
 
   //print augmented sigma points result
-  if (debug) std::cout << "Xsig_aug = " << std::endl << Xsig_aug << std::endl;
+#if UKF_DEBUG
+  std::cout << "Xsig_aug = " << std::endl << Xsig_aug << std::endl;
+#endif
 
 
   /*****************************************************************************
@@ -270,7 +281,9 @@ void UKF::Prediction(double delta_t) {
  }  
 
   //print predicted sigma points
-  if (debug) std::cout << "Xsig_pred = " << std::endl << Xsig_pred_ << std::endl;
+#if UKF_DEBUG
+  std::cout << "Xsig_pred = " << std::endl << Xsig_pred_ << std::endl;
+#endif
 
 
   /*****************************************************************************
@@ -297,13 +310,12 @@ void UKF::Prediction(double delta_t) {
   }
 
   //print predicted state mean and covariance
-  if (debug) 
-  {
+#if UKF_DEBUG
     std::cout << "Predicted state" << std::endl;
     std::cout << x_ << std::endl;
     std::cout << "Predicted covariance matrix" << std::endl;
     std::cout << P_ << std::endl;
-  }
+#endif
 }
 
 
@@ -358,11 +370,10 @@ void UKF::UpdateLidar(MeasurementPackage measurement_pack) {
   S(1,1) += std_laspy_ * std_laspy_;
 
   //print predicted measurement mean and covariance matrix S
-  if (debug) 
-  {
+#if UKF_DEBUG
     std::cout << "z_pred: " << std::endl << z_pred << std::endl;
     std::cout << "S: " << std::endl << S << std::endl;
-  }
+#endif
 
   /*****************************************************************************
   *  Update state with lidar measurement
@@ -376,15 +387,16 @@ void UKF::UpdateLidar(MeasurementPackage measurement_pack) {
   P_ -= K * S * K.transpose();
 
   //print updated state and covariance
-  if (debug) 
-  {
+#if UKF_DEBUG
     std::cout << "Updated state x: " << std::endl << x_ << std::endl;
     std::cout << "Updated state covariance P: " << std::endl << P_ << std::endl;
-  }
+#endif
 
   //calculate the NIS
   NIS_laser_ = z_diff_mean.transpose() * S_inv * z_diff_mean;
-  if (debug) std::cout << "NIS lidar: " << std::endl << NIS_laser_ << std::endl;
+#if UKF_DEBUG
+  std::cout << "NIS lidar: " << std::endl << NIS_laser_ << std::endl;
+#endif
 }
 
 
@@ -452,11 +464,10 @@ void UKF::UpdateRadar(MeasurementPackage measurement_pack) {
   S(2,2) += std_radrd_ * std_radrd_;
 
   //print predicted measurement mean and covariance matrix S
-  if (debug) 
-  {
+#if UKF_DEBUG
     std::cout << "z_pred: " << std::endl << z_pred << std::endl;
     std::cout << "S: " << std::endl << S << std::endl;
-  }
+#endif
 
   /*****************************************************************************
   *  Update state with radar measurement
@@ -470,13 +481,14 @@ void UKF::UpdateRadar(MeasurementPackage measurement_pack) {
   P_ -= K * S * K.transpose();
 
   //print updated state and covariance
-  if (debug) 
-  {
+#if UKF_DEBUG
     std::cout << "Updated state x: " << std::endl << x_ << std::endl;
     std::cout << "Updated state covariance P: " << std::endl << P_ << std::endl;
-  }
+#endif
 
   //calculate the NIS
   NIS_radar_ = z_diff_mean.transpose() * S_inv * z_diff_mean;
-  if (debug) std::cout << "NIS radar: " << std::endl << NIS_radar_ << std::endl;
+#if UKF_DEBUG
+  std::cout << "NIS radar: " << std::endl << NIS_radar_ << std::endl;
+#endif
 }

@@ -1,6 +1,8 @@
 #ifndef UKF_H
 #define UKF_H
 
+#define UKF_DEBUG 0
+
 #include "measurement_package.h"
 #include "Eigen/Dense"
 #include <vector>
@@ -109,8 +111,6 @@ public:
    */
   void UpdateRadar(MeasurementPackage meas_package);
 
-private:
-  bool debug;
 };
 
 #endif /* UKF_H */
